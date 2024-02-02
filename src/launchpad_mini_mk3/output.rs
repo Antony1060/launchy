@@ -65,9 +65,9 @@ impl RgbColor {
         self_
     }
 
-    /// Check whether the rgb color is valid - each component may only go up to 63.
+    /// Check whether the rgb color is valid - each component may only go up to 127.
     pub fn is_valid(&self) -> bool {
-        self.r <= 63 && self.g <= 63 && self.b <= 63
+        self.r <= 127 && self.g <= 127 && self.b <= 127
     }
 
     pub fn red(&self) -> u8 {
@@ -80,15 +80,15 @@ impl RgbColor {
         self.b
     }
     pub fn set_red(&mut self, r: u8) {
-        assert!(r <= 63);
+        assert!(r <= 127);
         self.r = r
     }
     pub fn set_green(&mut self, g: u8) {
-        assert!(g <= 63);
+        assert!(g <= 127);
         self.g = g
     }
     pub fn set_blue(&mut self, b: u8) {
-        assert!(b <= 63);
+        assert!(b <= 127);
         self.b = b
     }
 }
@@ -385,11 +385,11 @@ impl Output {
 
         let mut bytes = Vec::with_capacity(8 + 12 * buttons.len());
 
-        bytes.extend(&[240, 0, 32, 41, 2, 24, 11]);
+        bytes.extend(&[240, 0, 32, 41, 2, 13, 3]);
         for pair in buttons {
             let &(button, color) = pair.borrow();
             assert!(color.is_valid());
-            bytes.extend(&[Self::encode_button(button), color.r, color.g, color.b]);
+            bytes.extend(&[3, Self::encode_button(button), color.r, color.g, color.b]);
         }
         bytes.push(247);
 
@@ -461,7 +461,7 @@ impl Output {
                 buffer.push(0);
 
                 buffer.push(row * 10 + column);
-                
+
                 buffer.push(color.id);
             }
         }
@@ -539,9 +539,22 @@ impl Output {
         text: &[u8],
         color: PaletteColor,
         should_loop: bool,
+        speed: u8,
     ) -> Result<(), crate::MidiError> {
         let bytes = &[
-            &[240, 0, 32, 41, 2, 24, 20, color.id(), should_loop as u8],
+            &[
+                240,
+                0,
+                32,
+                41,
+                2,
+                13,
+                7,
+                should_loop as u8,
+                speed,
+                0,
+                color.id(),
+            ],
             text,
             &[247],
         ]
@@ -550,7 +563,7 @@ impl Output {
         self.send(bytes)
     }
 
-    pub fn send_sleep(&mut self, sleep_mode: SleepMode) -> Result<() , crate::MidiError> {
+    pub fn send_sleep(&mut self, sleep_mode: SleepMode) -> Result<(), crate::MidiError> {
         self.send(&[240, 0, 32, 41, 2, 13, 9, sleep_mode as u8, 247])
     }
 
@@ -626,7 +639,7 @@ impl Output {
             }
         }
     }
- 
+
     // --------------------------------------------------------------------------------------------
     // Below this point are shorthand function
     // --------------------------------------------------------------------------------------------
@@ -702,6 +715,11 @@ impl Output {
         color: PaletteColor,
     ) -> Result<(), crate::MidiError> {
         self.light_columns(&[(column, color)])
+    }
+
+    pub fn set_brightness(&mut self, brightness: u8) -> Result<(), crate::MidiError> {
+        assert!(brightness <= 127);
+        self.send(&[240, 0, 32, 41, 2, 13, 8, brightness, 247])
     }
 
     /// Light a single row, specified by `row` (0-8). Note: the row counting begins at the control
